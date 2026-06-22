@@ -75,7 +75,7 @@ patch_config() {
 }
 
 get_team_id() {
-  curl -s -H "Authorization: Bearer $TOKEN" "$MM_URL/api/v4/teams/name/$TEAM_NAME" | jq -r '.id // empty'
+  curl -s -H "Authorization: Bearer $TOKEN" "$MM_URL/api/v4/teams/name/$TEAM_NAME" | jq -r 'if has("status_code") then "" else .id end'
 }
 
 create_team() {
@@ -86,7 +86,7 @@ create_team() {
 }
 
 get_user_id() {
-  curl -s -H "Authorization: Bearer $TOKEN" "$MM_URL/api/v4/users/username/$1" | jq -r '.id // empty'
+  curl -s -H "Authorization: Bearer $TOKEN" "$MM_URL/api/v4/users/username/$1" | jq -r 'if has("status_code") then "" else .id end'
 }
 
 create_user() {
@@ -96,6 +96,13 @@ create_user() {
     | jq -r '.id'
 }
 
+verify_user_email() {
+  # Admin-created users aren't auto-verified the way the bootstrap admin is.
+  # Force-verify so login doesn't depend on RequireEmailVerification timing.
+  curl -s -X POST "$MM_URL/api/v4/users/$1/email/verify/member" \
+    -H "Authorization: Bearer $TOKEN" > /dev/null
+}
+
 add_user_to_team() {
   curl -s -X POST "$MM_URL/api/v4/teams/$1/members" \
     -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
@@ -103,7 +110,7 @@ add_user_to_team() {
 }
 
 get_channel_id() {
-  curl -s -H "Authorization: Bearer $TOKEN" "$MM_URL/api/v4/teams/$1/channels/name/$CHANNEL_NAME" | jq -r '.id // empty'
+  curl -s -H "Authorization: Bearer $TOKEN" "$MM_URL/api/v4/teams/$1/channels/name/$CHANNEL_NAME" | jq -r 'if has("status_code") then "" else .id end'
 }
 
 create_channel() {
@@ -162,6 +169,7 @@ main() {
       log "creating user '$username'"
       USER_ID=$(create_user "$username")
     fi
+    verify_user_email "$USER_ID"
     add_user_to_team "$TEAM_ID" "$USER_ID"
     add_user_to_channel "$CHANNEL_ID" "$USER_ID"
   done
