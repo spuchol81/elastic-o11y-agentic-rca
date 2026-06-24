@@ -30,6 +30,13 @@ export KB_USER="${KB_USER:-elastic}"
 export KB_PASS="${KB_PASS:-changeme}"
 # ELASTICSEARCH_APIKEY is expected to come from $ENV_FILE
 
+########### AI SETUP ###########
+/opt/workshops/elastic-llm.sh -k true
+
+########## Solution view ##########
+
+/opt/workshops/elastic-view.sh -v oblt
+
 ######### DEPENDENCIES ##########
 
 python3 -m pip install --quiet elasticsearch
