@@ -2,11 +2,13 @@
 """
 Kibana Workflow setup for the ShopEasy alert triage demo.
 
-Instruqt variant of ../setup_workflow.py — identical create/update logic,
-pointed at the self-hosted Kibana running inside the Instruqt sandbox VM
-instead of an Elastic Cloud deployment. Only the connection bootstrap
-differs; the workflow YAML is read from the repo root so there is a single
-source of truth for both deployment modes.
+Instruqt variant of ../setup_workflow.py — same create/update logic, pointed
+at the self-hosted Kibana running inside the Instruqt sandbox VM instead of
+an Elastic Cloud deployment. Reads its OWN workflow_alert_triage.yaml from
+this directory (not the repo root) because the step-type syntax diverges:
+this version targets Kibana 9.4.2's reorganized Workflows API (ai.agent for
+Agent Builder calls, cases.* for case management, instead of the generic
+kibana.request escape hatch the root file still uses).
 
 Creates or updates:
   workflow_alert_triage  — alert-triggered RCA + case + Slack notification
@@ -33,7 +35,7 @@ HEADERS = {
     "kbn-xsrf":      "true",
 }
 
-WORKFLOW_FILE = Path(__file__).resolve().parent.parent / "workflow_alert_triage.yaml"
+WORKFLOW_FILE = Path(__file__).resolve().parent / "workflow_alert_triage.yaml"
 WORKFLOW_NAME = "ShopEasy — Alert Triage"
 
 

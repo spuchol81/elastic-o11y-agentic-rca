@@ -182,8 +182,8 @@ Call `rca_lookup_datafeed(?job_id)` → returns `indices`.
 ### Step 4 — For each anomaly: fetch raw signals
 ```esql
 FROM ?indices
-| WHERE @timestamp >= ?bucketdate
-  AND @timestamp < ?bucketdate + ?bucketspan
+| WHERE @timestamp >= \"?bucketdate\"
+  AND @timestamp < \"?bucketdate + ?bucketspan\"
 | SORT @timestamp ASC
 ```
 ### Step 5 — Build the story

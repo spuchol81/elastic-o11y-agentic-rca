@@ -1,0 +1,130 @@
+version: "1"
+name: ShopEasy — Alert Triage
+description: >
+  Triggered by any ShopEasy ML anomaly alert rule (tagged shopeasy + ml).
+  Invokes rca_agent with the alert_analysis skill to produce an individual RCA,
+  creates an observability case routed to the responsible team, attaches the
+  alert, and notifies the on-call Slack channel. The operator follows the
+  Kibana link to the Agent Builder conversation to review findings and
+  accept remediation.
+
+enabled: true
+tags:
+  - shopeasy
+  - auto-triage
+  - ml
+
+consts:
+  slack_connector: "elastic-integration"
+  kibana_url: "https://agentic-rca-demo-e9c331.kb.europe-west1.gcp.cloud.es.io"
+
+triggers:
+  - type: alert
+
+steps:
+
+  # ── Step 1: Fetch the triggering anomaly record directly ──────────────────────
+  - name: fetch_anomaly
+    type: elasticsearch.esql.query
+    with:
+      query: >
+        FROM .ml-anomalies-*
+        | WHERE result_type == "record"
+          AND job_id == "{{ event.rule.tags[2] }}"
+          AND record_score >= 50
+          AND @timestamp > NOW() - 24h
+        | SORT @timestamp DESC
+        | LIMIT 1
+        | KEEP job_id, record_score, timestamp
+      format: json
+
+  # ── Step 2: Run RCA via rca_agent ────────────────────────────────────────────
+  - name: run_rca
+    type: ai.agent
+    create-conversation: true
+    agent-id: rca_agent
+    with:
+      message: |
+       Alert fired: {{ event.rule.name }}
+       Anomaly job: {{ steps.fetch_anomaly.output.values[0][0] }}
+       Anomaly score: {{ steps.fetch_anomaly.output.values[0][1] }}
+       Anomaly timestamp: {{ steps.fetch_anomaly.output.values[0][2] }}
+       Use the alert_analysis skill.
+       Investigate ONLY the incident at the anomaly timestamp above.
+       Do not investigate other windows. Produce one structured RCA block.
+
+
+  # ── Step 2: Create observability case ────────────────────────────────────────
+  - name: open_case
+    type: cases.createCase
+    with:
+      title: "{{ event.rule.name }}"
+      description: |
+       ## Automated Incident Triage
+
+        **Alert:** {{ event.rule.name }}
+        **Anomaly job:** {{ event.alerts[0].job_id }}
+        **Anomaly score:** {{ event.alerts[0].record_score }}
+        **Triggered:** {{ execution.startedAt }}
+
+        [Open AI Conversation](/app/agent_builder/conversations/{{ steps.run_rca.output.conversation_id }})
+      severity: "high"
+      owner: "observability"
+      tags:
+        - "shopeasy"
+        - "auto-triage"
+        - "ml"
+  # ── Step 3: Attach the triggering alert to the case ──────────────────────────
+  - name: attach_alert_to_case
+    type: cases.addAlerts
+    with:
+     case_id: "{{ steps.open_case.output.case.id }}"
+     alerts:
+      - alertId: "{{ event.alerts[0]._id }}"
+        index: "{{ event.alerts[0]._index }}"
+        rule:
+          id: "{{ event.rule.id }}"
+          name: "{{ event.rule.name }}"
+
+  # ── Step 5: Ask agent to produce remediation handoff message ─────────────────
+  - name: run_remediation_request
+    type: ai.agent
+    agent-id: rca_agent
+    with:
+      conversation_id: "{{ steps.run_rca.output.conversation_id }}"
+      message: |
+       Incident: {{ event.rule.name }}
+       Case ID: {{ steps.open_case.output.case.id }}
+       Workflow execution ID: {{ execution.id }}
+       Use the request_remediation skill.
+
+  # ── Step 6: Wait for operator confirmation ──────────────────────────
+  - name: await_remediation
+    type: waitForInput
+    with:
+      message: |
+        **{{ event.rule.name }}** — remediation required
+
+        {{ steps.run_remediation_request.output.message }}
+
+        [View RCA conversation]({{ consts.kibana_url }}/app/agent_builder/conversations/{{ steps.run_rca.output.conversation_id }})
+        [Open case]({{ consts.kibana_url }}/app/observability/cases/{{ steps.open_case.output.case.id }})
+      schema:
+        type: object
+        properties:
+          user_input:
+            type: string
+            title: "Type resolved to confirm"
+        required: ["user_input"]
+
+  # ── Step 7: Close case — operator confirmed by resuming the workflow ──────────
+  - name: add_resolution_comment
+    type: cases.addComment
+    with:
+      case_id: "{{ steps.open_case.output.case.id }}"
+      comment: "Incident resolved — confirmed by operator."
+
+  - name: close_case
+    type: cases.closeCase
+    with:
+     case_id: "{{ steps.open_case.output.case.id }}"
