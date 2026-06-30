@@ -173,27 +173,31 @@ Call `rca_app_availability`. Group contiguous non-zero buckets into distinct win
 (gap of ≥ 20 minutes = separate incident). Record start and end for each window.
 If none → stop.
 
-### Step 2 — For each window: find correlated ML anomalies
-Call `rca_fetch_anomalies_in_window(?window_start, ?window_end)`.
+### Step 2 — Process EVERY window (repeat 2a-2c for window 1, then window 2, then window 3 — do NOT skip to Step 3 until all windows are done)
 
-### Step 3 — For each anomaly: look up source index
-Call `rca_lookup_datafeed(?job_id)` → returns `indices`.
+**2a** Call `rca_fetch_anomalies_in_window(?window_start, ?window_end)`.
 
-### Step 4 — For each anomaly: fetch raw signals
+**2b** For EACH anomaly returned: call `rca_lookup_datafeed(?job_id)` → get `indices`.
+
+**2c** For EACH anomaly: fetch raw signals:
 ```esql
 FROM ?indices
 | WHERE @timestamp >= \"?bucketdate\"
   AND @timestamp < \"?bucketdate + ?bucketspan\"
 | SORT @timestamp ASC
 ```
-### Step 5 — Build the story
-One row per incident window in the summary table.
 
-|Incident window |\tResponsible component |What happened|
-|-----------------|--------------------------|-----------------|
-|From synthetics timestamps|Designate the component based on logs/metrics index name and parameters|Root cause derived from raw log evidence
+Repeat 2a-2c for every remaining window before continuing.
 
-One sentence of root cause explanation per row, grounded in the log data — no speculation beyond what the signals show.
+### Step 3 — Build the story
+
+**First**, output EXACTLY this markdown table with one row per incident window — do not skip or replace it with prose:
+
+| Incident window | Responsible component | What happened |
+|---|---|---|
+| <start> → <end> from synthetics | <service / host / system> | <one sentence root cause> |
+
+**Then**, for each incident in the table, add a short paragraph elaborating on the root cause with evidence from the raw signals (logs, metrics, traces).
 
 ### Constraints
 
