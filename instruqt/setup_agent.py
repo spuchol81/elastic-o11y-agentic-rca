@@ -177,7 +177,7 @@ Before continuing, explicitly list every window you found, numbered:
 - Window 1: <start> → <end>
 - Window 2: <start> → <end>
 - ...
-Keep this list visible — you will check off each window as you process it in Step 2.
+Do not stop or wait for user input — proceed immediately to Step 2.
 
 ### Step 2 — Process EVERY window (repeat 2a-2c for window 1, then window 2, then window 3 — do NOT skip to Step 3 until all windows are done)
 
