@@ -173,6 +173,12 @@ Call `rca_app_availability`. Group contiguous non-zero buckets into distinct win
 (gap of ≥ 20 minutes = separate incident). Record start and end for each window.
 If none → stop.
 
+Before continuing, explicitly list every window you found, numbered:
+- Window 1: <start> → <end>
+- Window 2: <start> → <end>
+- ...
+Keep this list visible — you will check off each window as you process it in Step 2.
+
 ### Step 2 — Process EVERY window (repeat 2a-2c for window 1, then window 2, then window 3 — do NOT skip to Step 3 until all windows are done)
 
 **2a** Call `rca_fetch_anomalies_in_window(?window_start, ?window_end)`.
@@ -187,7 +193,7 @@ FROM ?indices
 | SORT @timestamp ASC
 ```
 
-Repeat 2a-2c for every remaining window before continuing.
+After each window, check it off your list. Before moving to Step 3, confirm every window from your Step 1 list has been checked off.
 
 ### Step 3 — Build the story
 
