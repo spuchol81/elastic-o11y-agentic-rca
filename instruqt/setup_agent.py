@@ -11,7 +11,8 @@ Creates:
   Tools (custom ESQL):
     rca_app_availability            — synthetics downtime buckets (incident windows)
     rca_fetch_anomalies_in_window   — ML anomalies scoped to one incident window
-    rca_lookup_datafeed             — resolve ML job → source index
+    rca_fetch_app_errors            — app error distribution within a window
+    rca_fetch_firewall_change       — firewall config changes within a window
 
   Skills:
     morning_meteo                   — nightly weather-report procedure
@@ -122,29 +123,59 @@ TOOLS = [
         },
     },
     {
-        "id": "rca_lookup_datafeed",
+        "id": "rca_fetch_app_errors",
         "type": "esql",
         "description": (
-            "Looks up the source indices a given ML job's datafeed reads from.\n"
-            "Call this after identifying an anomaly to find out which index to query for raw signals.\n"
-            "\n"
-            "Parameter:\n"
-            " ?job_id  — the job_id from the anomaly record (e.g. \"shopeasy-firewall-rare-action\")\n"
-            "\n"
-            "Output:\n"
-            "indices  — list of index patterns the datafeed queries (e.g. \"logs-shopeasy.firewall-default\")\n"
+            "Returns app errors distribution over the time window.\n"
+            "Use this to document root cause analysis if application ML anomalies are found."
         ),
         "tags": ["RCA"],
         "configuration": {
             "query": (
-                "FROM .ml-config*\n"
-                "| WHERE datafeed_id IS NOT NULL AND job_id == ?job_id\n"
-                "| KEEP indices"
+                "FROM logs-shopeasy.app-default\n"
+                "| WHERE error.message IS NOT NULL\n"
+                "  AND @timestamp >= ?window_start\n"
+                "  AND @timestamp <= ?window_end\n"
+                "| STATS count(*) BY error.message"
             ),
             "params": {
-                "job_id": {
-                    "type": "string",
-                    "description": "the id of the ml job you want to get datafeed for",
+                "window_start": {
+                    "type": "date",
+                    "description": "incident start timestamp",
+                    "optional": False,
+                },
+                "window_end": {
+                    "type": "date",
+                    "description": "incident end timestamp",
+                    "optional": False,
+                },
+            },
+        },
+    },
+    {
+        "id": "rca_fetch_firewall_change",
+        "type": "esql",
+        "description": (
+            "Returns firewall config changes during the time window.\n"
+            "Use this if firewall anomalies are detected."
+        ),
+        "tags": ["RCA"],
+        "configuration": {
+            "query": (
+                "FROM logs-shopeasy.firewall-default\n"
+                "| WHERE event.dataset == \"firewall.config\"\n"
+                "  AND @timestamp >= ?window_start\n"
+                "  AND @timestamp <= ?window_end"
+            ),
+            "params": {
+                "window_start": {
+                    "type": "date",
+                    "description": "incident start timestamp",
+                    "optional": False,
+                },
+                "window_end": {
+                    "type": "date",
+                    "description": "incident end timestamp",
                     "optional": False,
                 },
             },
@@ -171,31 +202,19 @@ Surface all app incidents from the last 24 hours, identify the infrastructure an
 ### Step 1 — Identify incident windows
 Call `rca_app_availability`. Group contiguous non-zero buckets into distinct windows
 (gap of ≥ 20 minutes = separate incident). Record start and end for each window.
-If none → stop.
 
-Before continuing, explicitly list every window you found, numbered:
-- Window 1: <start> → <end>
-- Window 2: <start> → <end>
-- ...
-Do not stop or wait for user input — proceed immediately to Step 2.
 
-### Step 2 — Process EVERY window (repeat 2a-2c for window 1, then window 2, then window 3 — do NOT skip to Step 3 until all windows are done)
+### Step 2 — Process EVERY window
+For each window call `rca_fetch_anomalies_in_window(?window_start, ?window_end)`.
+These are machine learning Jobs that will help you understand what happened during these windows.
+Ensure all windows have been covered before going to step 3.
 
-**2a** Call `rca_fetch_anomalies_in_window(?window_start, ?window_end)`.
+### Step 3 — Deepen knowledge
+For each window, look for any firewall config change during the window with `rca_fetch_firewall_change(?window_start, ?window_end)`.
+For each window, look for error log distribution over the window with `rca_fetch_app_errors(?window_start, ?window_end)`.
 
-**2b** For EACH anomaly returned: call `rca_lookup_datafeed(?job_id)` → get `indices`.
-
-**2c** For EACH anomaly: fetch raw signals:
-```esql
-FROM ?indices
-| WHERE @timestamp >= \"?bucketdate\"
-  AND @timestamp < \"?bucketdate + ?bucketspan\"
-| SORT @timestamp ASC
-```
-
-After each window, check it off your list. Before moving to Step 3, confirm every window from your Step 1 list has been checked off.
-
-### Step 3 — Build the story
+### Step 4 — Build the story
+Ensure Steps 1, 2 and 3 have been run before starting this step.
 
 **First**, output EXACTLY this markdown table with one row per incident window — do not skip or replace it with prose:
 
@@ -360,9 +379,10 @@ For each incident investigated, produce:
                     "platform.core.get_index_mapping",
                     "platform.core.get_workflow_execution_status",
                     "platform.core.resume_workflow_execution",
-                    "rca_lookup_datafeed",
                     "rca_app_availability",
                     "rca_fetch_anomalies_in_window",
+                    "rca_fetch_app_errors",
+                    "rca_fetch_firewall_change",
                     "platform.core.execute_esql",
                     "platform.core.generate_esql",
                 ]
