@@ -90,6 +90,15 @@ def setup_workflow() -> None:
             )
         yaml_str = yaml_str.replace("__MATTERMOST_CONNECTOR_ID__", connector_id)
 
+    if "__INSTRUQT_PARTICIPANT_ID__" in yaml_str:
+        participant_id = os.environ.get("INSTRUQT_PARTICIPANT_ID")
+        if not participant_id:
+            raise RuntimeError(
+                "INSTRUQT_PARTICIPANT_ID env var not set — needed to build the public "
+                "per-participant URL used in notify_mattermost's case link"
+            )
+        yaml_str = yaml_str.replace("__INSTRUQT_PARTICIPANT_ID__", participant_id)
+
     existing_id = get_workflow_id(WORKFLOW_NAME)
 
     if existing_id:

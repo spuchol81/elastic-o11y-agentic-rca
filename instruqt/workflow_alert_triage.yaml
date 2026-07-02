@@ -18,6 +18,7 @@ consts:
   slack_connector: "elastic-integration"
   kibana_url: "https://agentic-rca-demo-e9c331.kb.europe-west1.gcp.cloud.es.io"
   mattermost_connector_id: "__MATTERMOST_CONNECTOR_ID__"
+  instruqt_participant_id: "__INSTRUQT_PARTICIPANT_ID__"
 
 triggers:
   - type: alert
@@ -83,9 +84,11 @@ steps:
         **Triggered:** {{ execution.startedAt }}
 
         **Details:**
-        {{ steps.run_rca.output.message }}
+        :rotating_light: **{{ event.rule.name }}** :rotating_light:
+         **Time window:** {{ steps.run_rca.output.structured_output.time_window }}
+         **Root cause:** {{ steps.run_rca.output.structured_output.root_cause }}
+         **Responsible:** {{ steps.run_rca.output.structured_output.responsible_team }}
 
-        [Open AI Conversation](/app/agent_builder/conversations/{{ steps.run_rca.output.conversation_id }})
       severity: "high"
       owner: "observability"
       tags:
@@ -106,7 +109,7 @@ steps:
         kbn-xsrf: "true"
       body:
         params:
-           body: '{"text": ":rotating_light: **{{ event.rule.name }}**\n**Time window:** {{ steps.run_rca.output.structured_output.time_window }}\n**Root cause:** {{ steps.run_rca.output.structured_output.root_cause }}\n**Responsible:** {{ steps.run_rca.output.structured_output.responsible_team }}\n[Open case](http://kubernetes-vm:30001/app/observability/cases/{{ steps.open_case.output.case.id }})"}'
+           body: '{"text": ":rotating_light: **{{ event.rule.name }}** :rotating_light: \n**Time window:** {{ steps.run_rca.output.structured_output.time_window }}\n**Root cause:** {{ steps.run_rca.output.structured_output.root_cause }}\n**Responsible:** {{ steps.run_rca.output.structured_output.responsible_team }}\n[Open case](https://kubernetes-vm-30001-{{consts.instruqt_participant_id}}.env.play.instruqt.com/app/observability/cases/{{ steps.open_case.output.case.id }})"}'
 
   # ── Step 3: Attach the triggering alert to the case ──────────────────────────
   - name: attach_alert_to_case

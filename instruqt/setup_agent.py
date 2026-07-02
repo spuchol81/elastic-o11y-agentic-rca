@@ -287,16 +287,9 @@ Set:
 Call `rca_fetch_anomalies_in_window(?window_start, ?window_end)`.
 Multiple jobs may have fired for the same incident — include all of them.
 
-### Step 3 — For each anomaly: resolve source index
-Call `rca_lookup_datafeed(?job_id)` → returns `indices`.
-
-### Step 4 — For each anomaly: fetch raw signals
-```esql
-FROM ?indices
-| WHERE @timestamp >= ?bucketdate
-  AND @timestamp < ?bucketdate + ?bucketspan
-| SORT @timestamp ASC
-```
+### Step 3 — Deepen knowledge
+look for any firewall config change during the window with `rca_fetch_firewall_change(?window_start, ?window_end)`.
+look for error log distribution over the window with `rca_fetch_app_errors(?window_start, ?window_end)`.
 
 ### Step 5 — Produce structured RCA
 
@@ -312,21 +305,20 @@ Do NOT use Markdown: no **double asterisks**, no ## headers, no --- dividers.
 • next event
 • …
 *Responsible component:* the service, host, or system that caused the failure
-*Responsible team:* one of — <!subteam^S0B9DGT8RST|@app-team> | <!subteam^S0B9DGUUFRV|@vmware-team> | <!subteam^S0B9NKM0YP5|@firewall-team>
+*Responsible team:* one of — @app-team | @vmware-team | @firewall-team
 *Recommended action:* what to do or verify next
 
 ### Responsible team assignment rules
-- App code errors (NullPointerException, missing config, bad deploy) → <!subteam^S0B9DGT8RST|@app-team>
-- VM / hypervisor / backup / disk I/O issues (cpu.ready, backup job, datastore) → <!subteam^S0B9DGUUFRV|@vmware-team>
-- Firewall rules, routing, network configuration → <!subteam^S0B9NKM0YP5|@firewall-team>
+- App code errors (NullPointerException, missing config, bad deploy) → @app-team
+- VM / hypervisor / backup / disk I/O issues (cpu.ready, backup job, datastore) → @vmware-team
+- Firewall rules, routing, network configuration → @firewall-team
 
 ### Hard constraints
 - Investigate exactly ONE window derived from the anomaly timestamp. Stop after Step 5.
 - Never call rca_app_availability — it returns all windows and will derail the scope.
 - Never query unbounded time ranges.
 - Do not mention ML jobs or anomaly scores in the output.
-- Root cause must follow from raw signal evidence, not speculation.
-- Output format must be Slack mrkdwn only — no Markdown headers, no double asterisks, no horizontal rules.
+- Root cause must follow from raw signal evidence, not speculation..
 """,
         "tool_ids": [],
     },
