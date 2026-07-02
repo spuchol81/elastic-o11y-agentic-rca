@@ -47,11 +47,10 @@ cd "$SCRIPT_DIR"
 
 python3 ingest.py
 python3 setup_agent.py
-python3 setup_workflow.py
-python3 setup_ml_jobs.py
-python3 setup_dashboard.py
 
 ######### MATTERMOST CONNECTOR ##########
+# Must run before setup_workflow.py — the workflow's notify_mattermost step
+# resolves this connector's ID by name at update time (see setup_workflow.py).
 
 MM_URL="${MM_URL:-http://host-1:8065}"
 
@@ -99,3 +98,7 @@ curl -sf -X POST "$KB_URL/api/actions/connector" \
   }" > /dev/null
 
 echo "[setup-elastic] Kibana Webhook connector 'mattermost-incidents' -> $MM_WEBHOOK_URL"
+
+python3 setup_workflow.py
+python3 setup_ml_jobs.py
+python3 setup_dashboard.py

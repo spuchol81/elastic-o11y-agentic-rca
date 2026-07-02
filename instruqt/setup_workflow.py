@@ -65,10 +65,31 @@ def get_workflow_id(name: str) -> str | None:
     return None
 
 
+def get_connector_id(name: str) -> str | None:
+    """Return the current ID of the named Kibana connector, or None if not found."""
+    resp, status = kb("GET", "/api/actions/connectors")
+    if status != 200:
+        return None
+    for conn in resp:
+        if conn.get("name") == name:
+            return conn["id"]
+    return None
+
+
 def setup_workflow() -> None:
     print("Setting up workflow …\n")
 
-    yaml_str    = WORKFLOW_FILE.read_text()
+    yaml_str = WORKFLOW_FILE.read_text()
+
+    if "__MATTERMOST_CONNECTOR_ID__" in yaml_str:
+        connector_id = get_connector_id("mattermost-incidents")
+        if not connector_id:
+            raise RuntimeError(
+                "Mattermost connector 'mattermost-incidents' not found — "
+                "run the Mattermost connector setup in setup_elastic.sh before setup_workflow.py"
+            )
+        yaml_str = yaml_str.replace("__MATTERMOST_CONNECTOR_ID__", connector_id)
+
     existing_id = get_workflow_id(WORKFLOW_NAME)
 
     if existing_id:

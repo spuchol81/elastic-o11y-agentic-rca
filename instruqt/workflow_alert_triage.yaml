@@ -17,6 +17,7 @@ tags:
 consts:
   slack_connector: "elastic-integration"
   kibana_url: "https://agentic-rca-demo-e9c331.kb.europe-west1.gcp.cloud.es.io"
+  mattermost_connector_id: "__MATTERMOST_CONNECTOR_ID__"
 
 triggers:
   - type: alert
@@ -52,9 +53,23 @@ steps:
        Use the alert_analysis skill.
        Investigate ONLY the incident at the anomaly timestamp above.
        Do not investigate other windows. Produce one structured RCA block.
+      schema:
+        type: object
+        properties:
+          time_window:
+            type: string
+          user_impact:
+            type: string
+          root_cause:
+            type: string
+          responsible_component:
+            type: string
+          responsible_team:
+            type: string
+          recommended_action:
+            type: string
 
-
-  # ── Step 2: Create observability case ────────────────────────────────────────
+  # ── Step 2a: Create observability case ────────────────────────────────────────
   - name: open_case
     type: cases.createCase
     with:
@@ -67,6 +82,9 @@ steps:
         **Anomaly score:** {{ event.alerts[0].record_score }}
         **Triggered:** {{ execution.startedAt }}
 
+        **Details:**
+        {{ steps.run_rca.output.message }}
+
         [Open AI Conversation](/app/agent_builder/conversations/{{ steps.run_rca.output.conversation_id }})
       severity: "high"
       owner: "observability"
@@ -74,6 +92,22 @@ steps:
         - "shopeasy"
         - "auto-triage"
         - "ml"
+  # ── Step 2b: Notify Mattermost incidents channel ──────────────────────────────
+  - name: notify_mattermost
+    type: kibana.request
+    with:
+      debug: true
+      use_server_info: true
+      fetcher:
+        skip_ssl_verification: true
+      method: POST
+      path: "/api/actions/connector/{{ consts.mattermost_connector_id }}/_execute"
+      headers:
+        kbn-xsrf: "true"
+      body:
+        params:
+           body: '{"text": ":rotating_light: **{{ event.rule.name }}**\n**Time window:** {{ steps.run_rca.output.structured_output.time_window }}\n**Root cause:** {{ steps.run_rca.output.structured_output.root_cause }}\n**Responsible:** {{ steps.run_rca.output.structured_output.responsible_team }}\n[Open case](http://kubernetes-vm:30001/app/observability/cases/{{ steps.open_case.output.case.id }})"}'
+
   # ── Step 3: Attach the triggering alert to the case ──────────────────────────
   - name: attach_alert_to_case
     type: cases.addAlerts
