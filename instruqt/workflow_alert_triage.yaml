@@ -123,38 +123,7 @@ steps:
           id: "{{ event.rule.id }}"
           name: "{{ event.rule.name }}"
 
-  # ── Step 5: Ask agent to produce remediation handoff message ─────────────────
-  - name: run_remediation_request
-    type: ai.agent
-    agent-id: rca_agent
-    with:
-      conversation_id: "{{ steps.run_rca.output.conversation_id }}"
-      message: |
-       Incident: {{ event.rule.name }}
-       Case ID: {{ steps.open_case.output.case.id }}
-       Workflow execution ID: {{ execution.id }}
-       Use the request_remediation skill.
-
-  # ── Step 6: Wait for operator confirmation ──────────────────────────
-  - name: await_remediation
-    type: waitForInput
-    with:
-      message: |
-        **{{ event.rule.name }}** — remediation required
-
-        {{ steps.run_remediation_request.output.message }}
-
-        [View RCA conversation]({{ consts.kibana_url }}/app/agent_builder/conversations/{{ steps.run_rca.output.conversation_id }})
-        [Open case]({{ consts.kibana_url }}/app/observability/cases/{{ steps.open_case.output.case.id }})
-      schema:
-        type: object
-        properties:
-          user_input:
-            type: string
-            title: "Type resolved to confirm"
-        required: ["user_input"]
-
-  # ── Step 7: Close case — operator confirmed by resuming the workflow ──────────
+  # ── Step 4: Close case — simulate operator action ──────────
   - name: add_resolution_comment
     type: cases.addComment
     with:
