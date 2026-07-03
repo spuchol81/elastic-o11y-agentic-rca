@@ -16,7 +16,6 @@ tags:
 
 consts:
   slack_connector: "elastic-integration"
-  kibana_url: "https://agentic-rca-demo-e9c331.kb.europe-west1.gcp.cloud.es.io"
   mattermost_connector_id: "__MATTERMOST_CONNECTOR_ID__"
   instruqt_participant_id: "__INSTRUQT_PARTICIPANT_ID__"
 

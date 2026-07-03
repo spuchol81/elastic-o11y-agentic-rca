@@ -1,0 +1,19 @@
+slug: agentic-rca-track-1noreo
+id: uqsbfy4iof6w
+title: '[Dev] Agentic-rca'
+description: ""
+icon: ""
+tags: []
+owner: elastic
+developers:
+- sylvain.puchol@elastic.co
+timelimit: 12000
+sandbox_preset: managed-vm-elastic-highmem-9-4-2
+lab_config:
+  sidebar_enabled: true
+  feedback_recap_enabled: true
+  feedback_tab_enabled: false
+  loadingMessages: true
+  hideStopButton: false
+checksum: "2826336090713388811"
+enhanced_loading: false
