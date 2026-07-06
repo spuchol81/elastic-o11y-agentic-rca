@@ -28,6 +28,7 @@ export ES_URL="${ES_URL:-http://elasticsearch-es-http.default.svc:9200}"
 export KB_URL="${KB_URL:-http://kubernetes-vm:30001}"
 export KB_USER="${KB_USER:-elastic}"
 export KB_PASS="${KB_PASS:-changeme}"
+KB_AUTH="Basic $(echo -n "$KB_USER:$KB_PASS" | base64)"
 # ELASTICSEARCH_APIKEY is expected to come from $ENV_FILE
 
 ########### AI SETUP ###########
@@ -36,6 +37,19 @@ export KB_PASS="${KB_PASS:-changeme}"
 ########## Solution view ##########
 
 /opt/workshops/elastic-view.sh -v oblt
+
+########## Disable Kibana "what's new" announcements/tours ##########
+# Global Settings (as opposed to per-space) live behind an internal route —
+# needs the internal-origin header in addition to the usual Kibana basic auth.
+
+GS_HTTP=$(curl -s -o /dev/null -w "%{http_code}" "${KB_URL}/internal/kibana/global_settings" \
+  -X POST \
+  -H 'Content-Type: application/json' \
+  -H 'kbn-xsrf: true' \
+  -H 'x-elastic-internal-origin: true' \
+  -H "Authorization: $KB_AUTH" \
+  --data-raw '{"changes":{"hideAnnouncements":true}}')
+echo "[setup-elastic] Global settings (hideAnnouncements) response: HTTP ${GS_HTTP}"
 
 ######### DEPENDENCIES ##########
 
@@ -69,8 +83,6 @@ WEBHOOK_ID=$(curl -sf -H "Authorization: Bearer $MM_TOKEN" \
   "$MM_URL/api/v4/hooks/incoming?channel_id=$CHANNEL_ID" | jq -r '.[0].id')
 
 MM_WEBHOOK_URL="$MM_URL/hooks/$WEBHOOK_ID"
-
-KB_AUTH="Basic $(echo -n "$KB_USER:$KB_PASS" | base64)"
 
 # Idempotent: delete existing connector by name before recreating
 EXISTING_ID=$(curl -sf "$KB_URL/api/actions/connectors" \
