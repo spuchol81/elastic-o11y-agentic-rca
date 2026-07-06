@@ -8,7 +8,7 @@ tabs:
   title: elastic
   type: service
   hostname: kubernetes-vm
-  path: /app/dashboards#
+  path: /app/dashboards#/list?_g=(filters:!(),refreshInterval:(pause:!t,value:1000),time:(from:now-24h,to:now))&s=Shopeasy
   port: 30001
   custom_request_headers:
   - key: Content-Security-Policy
