@@ -37,6 +37,14 @@ export KB_PASS="${KB_PASS:-changeme}"
 
 /opt/workshops/elastic-view.sh -v oblt
 
+########## Disable Kibana "what's new" announcements/tours ##########
+
+curl -sf -u "$KB_USER:$KB_PASS" \
+  -X POST "$KB_URL/api/kibana/settings" \
+  -H 'kbn-xsrf: true' \
+  -H 'Content-Type: application/json' \
+  -d '{"changes": {"hideAnnouncements": true}}' > /dev/null
+
 ######### DEPENDENCIES ##########
 
 python3 -m pip install --quiet elasticsearch
