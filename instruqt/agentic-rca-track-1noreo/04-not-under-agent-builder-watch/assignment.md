@@ -31,7 +31,9 @@ enhanced_loading: null
 
  The Alert That Never Woke You Up
 ===
-Inside  [Mattermost](tab-0) tab  log into the server with the following credentials
+Inside  [Mattermost](tab-0) tab , select ```view in browser``` option
+![Jul-07-2026_at_11.39.06-image.png](../assets/Jul-07-2026_at_11.39.06-image.png)
+log into the server with the following credentials
 - User: ```vmware-team```
 - Password:  ```Instruqt123!```
 ![Jul-06-2026_at_18.49.59-image.png](../assets/Jul-06-2026_at_18.49.59-image.png)
@@ -49,29 +51,41 @@ If you follow this link you will see that the reponsible team have solved the is
 ![Jul-06-2026_at_19.04.59-image.png](../assets/Jul-06-2026_at_19.04.59-image.png)
 
 > [!NOTE]
-> Elastic his watching continuously you observablity data and has analyzed every alert thrown and routed it to the corresponding on-call team on the dedicated Mattermost incident channel.
+> Elastic is watching continuously your MELT data,  has analyzed every alert thrown and routed it to the corresponding on-call team on the dedicated Mattermost incident channel.
 >
 >  It basically did the L0/L1 support duty in complete autonomy during the night, waking up on-call experts with an analysis of the problem to solve.
 
-## What Actually Happened While You Slept
  Pause a bit and understand what happened
 ===
-Inside [elastic](tab-A) go to **Alerts**. These are the raw machine learning anomaly alerts that fired overnight — the ones that kicked off everything you just read in Mattermost.
+See all the **Alerts** thrown in [elastic](tab-1) tab.  These are the raw machine learning anomaly alerts that fired overnight. It's the ones that kicked off everything you just read in Mattermost.
 
-1. You'll see the alerts, all already **Active**, one per incident — each one corresponds to an ML job that crossed its anomaly-score threshold during the night
+1.  Click on the **ShopEasy — VM CPU-ready anomaly** alert
+![Jul-07-2026_at_11.49.11-image.png](../assets/Jul-07-2026_at_11.49.11-image.png)
+2  Click on the three dots top menu, then on **Edit Rule**
+![Jul-07-2026_at_11.51.51-image.png](../assets/Jul-07-2026_at_11.51.51-image.png)
+3. Scroll down to the **Actions** step of the configuration
+![Jul-07-2026_at_11.56.19-image.png](../assets/Jul-07-2026_at_11.56.19-image.png)
+This is the wiring! Each rule doesn't just alert, it triggers the **ShopEasy — Alert Triage** workflow the instant it fires.
 
-2. Click on one of them, for instance the VM CPU-ready anomaly, to see the underlying ML job and the anomaly score that tripped it
+> [!IMPORTANT]
+> Let's check what this workflow does
+1. Go to workflows form the left  menu bar
+![Jul-07-2026_at_11.57.55-image.png](../assets/Jul-07-2026_at_11.57.55-image.png)
+1. Select **ShopEasy — Alert Triage**
+ ![Jul-07-2026_at_11.58.36-image.png](../assets/Jul-07-2026_at_11.58.36-image.png)
+2. Select **Executions** on the top of the page
+![Jul-07-2026_at_11.59.56-image.png](../assets/Jul-07-2026_at_11.59.56-image.png)
+3. Select one of the executions inside **Executions history**
+![Jul-07-2026_at_12.00.41-image.png](../assets/Jul-07-2026_at_12.00.41-image.png)
+4. Take some time to walkthrough all the Executions step, click on Input and Output tabs to understand data flow. See the ```run_rca``` agentic  step performing the analysis of the issue and then push its findings to create a case and notify relevant people on mattermost
+![Jul-07-2026_at_12.03.54-image.png](../assets/Jul-07-2026_at_12.03.54-image.png)
 
-3. Open the rule's **Actions** — this is the wiring. Each rule doesn't just alert, it triggers the **ShopEasy — Alert Triage** workflow the instant it fires
-
-4. Head to **Workflows** and open the run tied to this alert. You'll recognize every step of the case/Mattermost thread you just walked through — fully automated: fetch the anomaly, run the RCA, open the case, notify the on-call team on Mattermost, attach the alert, then close the case
-
-
-> [!NOTE]
-> **During this workshop you learned what Elastic and Agentic AI bring to your observability practice**
+> [!IMPORTANT]
 >
-> - **Operator quality of life**  no false positive pager call, no manual grep through four different log sources, no blank page to fill in before the coffee's even done. The agent absorbs the L0/L1 grind; a human only gets pulled in when real judgment is needed.
-> - **SLO protection**  detection, triage and routing happen in minutes instead of however long it takes a person to notice, investigate and correlate synthetics, logs and infra metrics by hand. That's MTTR measured in minutes, not hours, and error budget stays where it belongs.
-> - **Consistent investigation quality**  every incident gets the same rigor (downtime window → ML anomaly → logs → root cause), whether it fires at 2pm with the whole team watching or 3am with nobody awake.
+> During this workshop you learned how **Elastic and Agentic AI**  transform your production's operations.
 >
-> That's the AI augmented shift: not replacing the operator, but giving them their nights back while apps protected around the clock.
+> - *Operators get their lives back.* : No more waking up for false-positive alerts. No more grepping through four different log sources. No more staring at a blank incident report before the first coffee. AI handles the repetitive L0/L1 operational work, escalating only when human expertise and judgment truly matter.
+> - *SLO protection* :  Detection, triage, correlation, and routing happen in minutes, not after someone notices the issue and finally identifies the problem. Mean Time to Resolution drops from hours to minutes, preserving your error budget instead of consuming it.
+> - *Every investigation follows the same high standard* :  Whether an incident occurs at 2 PM with the entire team online or at 3 AM when nobody is awake, every response follows the same disciplined workflow
+>
+> This is the shift to AI-augmented operations: not replacing operators, but eliminating operational toil. Humans focus on decisions. AI handles the routine. Your teams get their nights back, while your applications stay protected 24/7.
