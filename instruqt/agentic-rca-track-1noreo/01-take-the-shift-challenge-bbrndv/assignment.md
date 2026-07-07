@@ -3,6 +3,15 @@ slug: take-the-shift-challenge-bbrndv
 id: fkzysdypybrn
 type: challenge
 title: Taking the shift
+notes:
+- type: text
+  contents: '![Jul-07-2026_at_12.30.46-image.png](../assets/Jul-07-2026_at_12.30.46-image.png)'
+- type: text
+  contents: '![Jul-07-2026_at_12.31.07-image.png](../assets/Jul-07-2026_at_12.31.07-image.png)'
+- type: text
+  contents: '![Jul-07-2026_at_12.31.36-image.png](../assets/Jul-07-2026_at_12.31.36-image.png)'
+- type: text
+  contents: '![Jul-07-2026_at_12.32.11-image.png](../assets/Jul-07-2026_at_12.32.11-image.png)'
 tabs:
 - id: r9okvzyimqo2
   title: elastic
