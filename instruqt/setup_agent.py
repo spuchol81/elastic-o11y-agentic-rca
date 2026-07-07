@@ -205,19 +205,13 @@ Call `rca_app_availability`. Group contiguous non-zero buckets into distinct win
 
 
 ### Step 2 — Process EVERY window
-For each window call `rca_fetch_anomalies_in_window(?window_start, ?window_end)`.
+call `rca_fetch_anomalies_in_window(?window_start, ?window_end)`.
 These are machine learning Jobs that will help you understand what happened during these windows.
-Ensure all windows have been covered before going to step 3.
+call `rca_fetch_firewall_change(?window_start, ?window_end)` to check if there was any firewall change in this window
+call `rca_fetch_app_errors(?window_start, ?window_end)` to have an overview of the app error code in this time window
 
-### Step 3 — Deepen knowledge (mandatory for every window, no exceptions)
-For EACH window from Step 1, call BOTH of these tools — never skip either one, even if the Step 2 anomaly already looks conclusive:
-- `rca_fetch_firewall_change(?window_start, ?window_end)`
-- `rca_fetch_app_errors(?window_start, ?window_end)`
-
-Before moving on, count your tool calls: you must have made 2 calls per window. If any window is missing one, make that call now — do not proceed to Step 4 with a gap.
-
-### Step 4 — Build the story
-Do not start this step until every window has a Step 2 anomaly lookup AND both Step 3 calls. A window backed only by the ML anomaly, without raw-signal evidence, is an incomplete investigation and must not be presented as finished.
+### Step 3 — Build the story
+Do not start this step until every window has all three Step 2 calls — the anomaly lookup, the firewall-change check, and the app-error check. A window backed only by the ML anomaly, without raw-signal evidence, is an incomplete investigation and must not be presented as finished.
 
 **First**, output EXACTLY this markdown table with one row per incident window — do not skip or replace it with prose:
 
