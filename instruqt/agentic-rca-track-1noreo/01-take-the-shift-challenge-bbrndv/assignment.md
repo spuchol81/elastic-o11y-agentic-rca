@@ -31,21 +31,35 @@ Then this lands in Mattermost from your VP:
 
 Let's use the ShopEasy Dashboard to find out the root cause of the overnight Issue
 
+> [!NOTE]
+> Walk through the dashboard to catch  anomaly that could have affected the Shopeasy service. When you are ready, click next to answer a Quizz.
+
 > [!IMPORTANT]
 > If you don't know where to start, unfold the [Guided Investigations](section-guided-investigations)
 
 Guided Investigations
 ===
 On the [ **elastic**](tab-0) tab, pull up the **ShopEasy Mission Control** dashboard — it's your single pane of glass across the whole stack:
+![Jul-07-2026_at_10.25.14-image.png](../assets/Jul-07-2026_at_10.25.14-image.png)
 
 1. **Start with the synthetics up top.** *Monitor Status (Up/Down) Over Time* and *Uptime Percentage per Monitor* will tell you *when* things actually broke, not just that they did.
-2. **Then chase it down through the three places trouble hides on this stack:**
-   - **Firewall / Network** — *Firewall DENY Rate on TCP/443 Over Time* and *Palo alto DENY vs ALLOW* — is traffic even making it past the edge?
-   - **Checkout / Application** — *Checkout Service Error Rate by Service Version Over Time* and *Error Rate (%) by Service Version — Regression Detection on New Deploys* — is the app falling over, and did something just get shipped?
-   - **Database / Compute** — *Average CPU Ready Time by VM (ms)* and *PostgreSQL Slow Query Block Read Time Over Time* — is the database, or the box underneath it, choking?
+![Jul-07-2026_at_10.26.05-image.png](../assets/Jul-07-2026_at_10.26.05-image.png)
+2. open the **Firewall / Network**  collapsible section
+![Jul-07-2026_at_10.28.13-image.png](../assets/Jul-07-2026_at_10.28.13-image.png)
+The *Palo alto DENY vs ALLOW*  visualization flags a lot more deny than usual during a 2hours period last night
+![Jul-07-2026_at_10.30.30-image.png](../assets/Jul-07-2026_at_10.30.30-image.png)
+3. open the **Software status**  collapsible section
+![Jul-07-2026_at_10.32.14-image.png](../assets/Jul-07-2026_at_10.32.14-image.png)
+We see error rate rising connected to a code version change
+![Jul-07-2026_at_10.33.51-image.png](../assets/Jul-07-2026_at_10.33.51-image.png)
+4. open the **Postgresql**  collapsible section
+ ![Jul-07-2026_at_10.36.47-image.png](../assets/Jul-07-2026_at_10.36.47-image.png)
+We see slow queries and locks at the end of the night
+![Jul-07-2026_at_10.35.58-image.png](../assets/Jul-07-2026_at_10.35.58-image.png)
+5. open the **VMware**  collapsible section
+![Jul-07-2026_at_10.37.09-image.png](../assets/Jul-07-2026_at_10.37.09-image.png)
+We see cpu ready time raising at the end of the night
+![Jul-07-2026_at_10.38.15-image.png](../assets/Jul-07-2026_at_10.38.15-image.png)
 
-> [!NOTE]
-> You don't need to write anything down yet — just build the picture: what broke, roughly when, and which of these three areas is actually to blame.
-When you are ready to provide your analysis, go to the next challenge.
 
 

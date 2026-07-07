@@ -56,14 +56,22 @@ If you follow this link you will see that the reponsible team have solved the is
 ## What Actually Happened While You Slept
  Pause a bit and understand what happened
 ===
-Inside  [elastic](tab-A) You will see alert thrown  during the night.
-Thes are machine learning
+Inside [elastic](tab-A) go to **Alerts**. These are the raw machine learning anomaly alerts that fired overnight — the ones that kicked off everything you just read in Mattermost.
 
-to be continued
+1. You'll see the alerts, all already **Active**, one per incident — each one corresponds to an ML job that crossed its anomaly-score threshold during the night
+
+2. Click on one of them, for instance the VM CPU-ready anomaly, to see the underlying ML job and the anomaly score that tripped it
+
+3. Open the rule's **Actions** — this is the wiring. Each rule doesn't just alert, it triggers the **ShopEasy — Alert Triage** workflow the instant it fires
+
+4. Head to **Workflows** and open the run tied to this alert. You'll recognize every step of the case/Mattermost thread you just walked through — fully automated: fetch the anomaly, run the RCA, open the case, notify the on-call team on Mattermost, attach the alert, then close the case
+
 
 > [!NOTE]
-> That's the same skill and the same agent you talked to directly in the last challenge — it's just as capable running unattended off an alert as it is answering you in chat.
-
-You didn't get paged, because by the time you would have been, there was nothing left to page you for. Priya gets her answer, on-call gets to sleep through the night, and the write-up basically already existed before you sat down with your coffee.
-
-That's the shift.
+> **During this workshop you learned what Elastic and Agentic AI bring to your observability practice**
+>
+> - **Operator quality of life**  no false positive pager call, no manual grep through four different log sources, no blank page to fill in before the coffee's even done. The agent absorbs the L0/L1 grind; a human only gets pulled in when real judgment is needed.
+> - **SLO protection**  detection, triage and routing happen in minutes instead of however long it takes a person to notice, investigate and correlate synthetics, logs and infra metrics by hand. That's MTTR measured in minutes, not hours, and error budget stays where it belongs.
+> - **Consistent investigation quality**  every incident gets the same rigor (downtime window → ML anomaly → logs → root cause), whether it fires at 2pm with the whole team watching or 3am with nobody awake.
+>
+> That's the AI augmented shift: not replacing the operator, but giving them their nights back while apps protected around the clock.
