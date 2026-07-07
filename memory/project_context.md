@@ -25,6 +25,8 @@ elastic-o11y-agentic-rca/
   workflow_alert_triage.yaml      # workflow definition YAML
   shopeasy_mission_control.ndjson # exported dashboard (by-value, self-contained)
   data/                           # output NDJSON files (regenerated on every ingest run)
+  instruqt/
+    setup_mattermost.sh           # bootstraps Mattermost as the Instruqt-lab Slack replacement
 ```
 
 ---
@@ -236,7 +238,7 @@ There is also "ShopEasy — App unreachable" — ESQL on synthetics `error.messa
 **File:** `workflow_alert_triage.yaml`
 **Trigger:** `type: alert` — fires when any wired alert rule transitions to active
 
-**Steps:**
+**Steps (root/Cloud version — see below, the instruqt version has diverged):**
 1. `fetch_anomaly` — ESQL on `.ml-anomalies-*` using `event.rule.tags[2]` as job_id filter
 2. `run_rca` — calls `rca_agent` via `/api/agent_builder/converse` with anomaly timestamp; 10m timeout
 3. `create_case` — Kibana observability case with RCA summary and conversation link
@@ -248,11 +250,14 @@ There is also "ShopEasy — App unreachable" — ESQL on synthetics `error.messa
 9. `refetch_case` — GET case to get current version
 10. `close_case` — `kibana.updateCase` sets status to closed
 
-**Critical design notes:**
+**Critical design notes (root/Cloud version):**
 - No `if` condition on close — `waitForInput` itself is the gate; any resume → close
 - `waitForInput` schema uses `user_input: string` (not `resolved: boolean`) — LLM naturally uses this field name
 - `run_remediation_request` input does NOT pass `Case ID` to avoid LLM confusing it with resume inputs
 - `event.alerts[0].*` fields are EMPTY for ESQL-type alert rules — job context comes from `event.rule.tags[2]`
+
+**Instruqt version diverged further (2026-07-02): human-in-the-loop remediation cut entirely.** `instruqt/workflow_alert_triage.yaml` no longer has `run_remediation_request` / `await_remediation` — after `attach_alert_to_case` it goes straight to `add_resolution_comment` ("Incident resolved — confirmed by operator.") then `close_case`, simulating operator confirmation instead of actually waiting for it. Explicit user decision: "We cut the human in the loop scenario and simulate operator case close instead" — likely to keep the Instruqt lab self-paced/short rather than requiring a real wait-for-input round-trip. The `request_remediation` skill in `instruqt/setup_agent.py` is left defined but now unused by this workflow. The top-of-file `description:` block still mentions "accept remediation" — stale text, not yet cleaned up.
+Instruqt steps now: `fetch_anomaly` → `run_rca` (with structured `schema`) → `open_case` → `notify_mattermost` → `attach_alert_to_case` → `add_resolution_comment` → `close_case`.
 
 **Kibana URL const:** `https://agentic-rca-demo-e9c331.kb.europe-west1.gcp.cloud.es.io`
 **Slack connector:** `elastic-integration` (`.slack_api` type)
@@ -272,6 +277,69 @@ There is also "ShopEasy — App unreachable" — ESQL on synthetics `error.messa
 **File:** `shopeasy_mission_control.ndjson`
 **Type:** By-value dashboard — all 30 panels embedded inline, ad-hoc data views, no external saved object references. Fully self-contained for import.
 **Data views (ad-hoc, inline):** `logs-shopeasy.synthetics-default`, `logs-shopeasy.firewall-default`, `logs-shopeasy.app-default`, `logs-shopeasy.postgresql-default`, `metrics-shopeasy.postgresql-default`, `metrics-shopeasy.vmware-default`, `traces-apm.shopeasy-default`
+
+---
+
+## Instruqt port: Mattermost as Slack replacement
+
+**Why:** Want a version of this demo deliverable as a self-paced Instruqt lab. Slack can't be the on-call notify target there (no frictionless self-hosted trial for an ephemeral sandbox). Evaluated PagerDuty / Opsgenie / Microsoft Teams / TheHive / Mattermost / Grafana OnCall against two criteria: (1) a native Elastic connector to post the RCA, (2) self-hostable inside the sandbox with no signup or trial-expiry friction. Landed on **Mattermost** (self-hosted `mattermost-preview` Docker image), wired via Kibana's generic **Webhook** connector — Mattermost has no named Kibana connector type, only Slack and Teams do.
+
+**Status:** Mattermost bootstrap inside the Instruqt sandbox VM works end-to-end, AND the workflow rewiring is done: `instruqt/workflow_alert_triage.yaml` has a `notify_mattermost` step (`kibana.request` → `POST /api/actions/connector/{{ consts.mattermost_connector_id }}/_execute`) between `open_case` and `attach_alert_to_case`, posting an RCA summary card (time window, root cause, responsible team, case link) built from `run_rca`'s `structured_output` fields. `run_rca` now declares a `schema` (time_window, user_impact, root_cause, responsible_component, responsible_team, recommended_action) to produce that structured output. Slack subteam-mention syntax in the `alert_analysis` skill HAS been retired in the instruqt version — see "`alert_analysis` skill retargeted for Mattermost" below.
+
+**Connector ID wiring (fixed 2026-07-02):** `instruqt/setup_elastic.sh` creates the Kibana Webhook connector `mattermost-incidents` by delete-then-recreate (`instruqt/setup_elastic.sh:75-98`) — this assigns a **new ID every run**, so the workflow can never hardcode it. Fix: the YAML carries `consts.mattermost_connector_id: "__MATTERMOST_CONNECTOR_ID__"` as a placeholder; `instruqt/setup_workflow.py`'s `get_connector_id(name)` looks it up by name via `GET /api/actions/connectors` and does a plain string-replace on the placeholder before creating/updating the workflow (raises if the connector isn't found yet). This mirrors the existing by-name-lookup pattern used for `system-connector-.workflows` action IDs in `setup_ml_jobs.py`. **Ordering requirement:** the Mattermost connector block in `setup_elastic.sh` must run before `python3 setup_workflow.py` — the script was reordered so `setup_workflow.py`/`setup_ml_jobs.py`/`setup_dashboard.py` now run *after* the connector-creation block instead of all five scripts running as one batch up front.
+
+**Public case URL wiring (2026-07-02):** The `notify_mattermost` step's "Open case" link must be reachable from the learner's browser, not just from inside the sandbox VM — `http://kubernetes-vm:30001` only resolves inside the cluster network. Instruqt exposes internal ports at a per-participant public URL of the form `https://kubernetes-vm-30001-<INSTRUQT_PARTICIPANT_ID>.env.play.instruqt.com`, where the participant ID is already present in the sandbox VM's process environment (`env | grep INSTRUQT_PARTICIPANT_ID`, no explicit sourcing needed). Same placeholder pattern as the connector ID: YAML carries `consts.instruqt_participant_id: "__INSTRUQT_PARTICIPANT_ID__"`, and `setup_workflow.py` substitutes it from `os.environ["INSTRUQT_PARTICIPANT_ID"]` (raises if unset) right before the Mattermost-connector-ID substitution. The `open_case` case description was also simplified to embed a rotating-light RCA summary (time window / root cause / responsible team) instead of the full `run_rca.output.message` + "Open AI Conversation" link.
+
+**Script:** `instruqt/setup_mattermost.sh` — idempotent. Starts/reuses the `mattermost-preview` container, waits for `/api/v4/system/ping`, bootstraps `admin` (first-ever user auto-promotes to System Admin), disables `RequireEmailVerification` + enables `EnableIncomingWebhooks`, creates team `shopeasy` ("ShopEasy Ops"), channel `#incidents`, three on-call users (`app-team`, `vmware-team`, `firewall-team` — mirrors the Slack subteam mapping below), adds them to team+channel, force-verifies each one's email, and creates an incoming webhook on `#incidents`. Default password for every account: `Instruqt123!`.
+
+**Gotchas hit (non-obvious — would re-bite on a fresh attempt):**
+- Mattermost error responses put the error *code* in the `.id` field (never null) — `jq -r '.id // empty'` can't distinguish "not found" from "found" this way. Idempotency checks must test `has("status_code")` instead.
+- Users created via the authenticated admin API are NOT auto-email-verified the way the bootstrap admin is — needs an explicit `POST /api/v4/users/{id}/email/verify/member` per user, even with `RequireEmailVerification` already patched to `false`.
+- Channel-by-name lookup (`GET /teams/{id}/channels/name/{name}`) still returns **archived** (soft-deleted) channels. An idempotency check based on this will report "exists" for an archived channel, but `POST /hooks/incoming` rejects archived channels as "doesn't exist." Fix: `POST /channels/{id}/restore` if `delete_at != 0`.
+- `mattermost-preview` keeps data across `docker start`/`stop` of the *same* container, but not across container recreation — an Instruqt environment reset wipes everything, including any script placed by hand (only what's actually wired into the track survives).
+- Passwords containing `!` (e.g. `Instruqt123!`) trigger bash interactive history expansion ("event not found") when pasted into a live terminal inside double quotes. `set +H` disables it; script files are unaffected since non-interactive shells skip history expansion.
+- Mattermost's **Custom Groups** feature (the @group-mention equivalent of Slack subteams) requires an Enterprise/Professional license — not available on the free Team Edition that `mattermost-preview` runs. Worked around with one real user per responsible team instead of group mentions.
+
+**Instruqt track exists and is already wired (discovered 2026-07-02):** Slug `agentic-rca-track-1noreo` (id `uqsbfy4iof6w`), team `elastic`, manage URL `https://play.instruqt.com/manage/elastic/tracks/agentic-rca-track-1noreo` (renamed from an earlier `untitled-track-*` slug in the UI — old URLs go stale, always re-check the slug in-browser before `instruqt track pull`). Pulled locally via `instruqt track pull agentic-rca-track-1noreo` into `instruqt/agentic-rca-track-1noreo/`. Structure: one challenge `01-take-the-shift-challenge-bbrndv` with two VM tabs (`kubernetes-vm`, `host-1`) plus two service tabs (Mattermost on `host-1:8065`, Kibana dashboards on `kubernetes-vm:30001`). Lifecycle setup scripts ARE wired already: `setup-kubernetes-vm` runs `git clone https://github.com/spuchol81/elastic-o11y-agentic-rca.git && elastic-o11y-agentic-rca/instruqt/setup_elastic.sh`; `setup-host-1` runs the same clone + `elastic-o11y-agentic-rca/instruqt/setup_mattermost.sh`. These clone from GitHub `origin/main` at sandbox-launch time (user manages the commit/push flow), so track behavior always reflects whatever is currently pushed there.
+
+**Not yet done:** nothing tracked here currently — Mattermost wiring, connector ID resolution, and track lifecycle wiring are all confirmed done as of 2026-07-02.
+
+**"Taking the Shift" learner scenario — designed 2026-07-03, NOT yet implemented (no files written).** Goal: turn the single empty challenge (`01-take-the-shift-challenge-bbrndv`, `assignment.md` currently frontmatter-only) into a 3-challenge learning flow where a learner plays an on-call operator: (1) investigate the overnight shift via the Mission Control dashboard, (2) answer one quiz question, (3) ask `rca_agent` directly and compare. Explicit user decision: don't touch any automation/setup scripts this round — content only (`assignment.md` + `track.yml` challenge entries).
+
+Final agreed design (superseded two earlier drafts — a per-outage 5-challenge version and a per-outage 3-quiz version — both rejected as too complex):
+1. **Challenge 1 "Take the Shift"** (existing folder, add body only) — scene-set as operator starting a shift, direct them to the `elastic` tab → Mission Control dashboard, name the 3 signal domains to check (network/firewall, application/checkout, compute/VM+Postgres) using real panel titles, no root causes given away, no check script.
+2. **Challenge 2 — single quiz question** (new, `type: quiz`), final phrasing (Option B, in-character, confirmed by user):
+   Stem: *"You've reviewed the dashboard. If you had to page one team right now, what's your call on last night?"*
+   Answers: `["It was a network problem", "It was a bad code deploy", "It was a compute/infra problem", "It was a combination of all the above"]`, `solution: [3]` — correct answer is the last one, since the 3 real outages map exactly onto network (firewall)/code (bad deploy)/compute (VMware backup→DB latency).
+3. **Challenge 3 "Ask Your RCA Co-Pilot"** (new, regular challenge) — learner navigates to Kibana's Agent Chat UI (found via global search "Agent Builder"/"Agents" — no hardcoded deep-link path exists/is documented, so instructions must say "use global search" not a guessed URL), picks `rca_agent`, asks an open-ended question like *"What happened to the ShopEasy platform last night? Give me a full incident report."* This triggers the `morning_meteo` skill (confirmed human-invocable in both root & instruqt `setup_agent.py`, identical content) — NOT `alert_analysis`, which is workflow-only and explicitly forbids the broad incident-scan tool.
+
+All 3 challenges reuse the same 4 tabs as challenge 1 (`kubernetes-vm` terminal, `host-1` terminal, `mattermost` service, `elastic` dashboard service) — no new tabs needed.
+
+**Execution plan for next session (not yet run):** use `instruqt challenge create --title "..."` (CLI confirmed installed at `/opt/homebrew/bin/instruqt`) from the track root to scaffold challenges 2 & 3 — mints real IDs and registers in `track.yml`, avoiding hand-rolled IDs. Then hand-edit `assignment.md` bodies/frontmatter and copy tabs. Run `instruqt track validate` before considering it done. Do NOT run `instruqt track push`/`deploy` without separately confirming with the user — that publishes to the shared remote track.
+
+Full plan detail saved at `/Users/spuchol/.claude/plans/tranquil-singing-aurora.md` (local Claude plan file, not in repo) if resuming this exact session's reasoning is useful.
+
+**`alert_analysis` skill retargeted for Mattermost (2026-07-02, instruqt only):** `instruqt/setup_agent.py`'s `alert_analysis` skill content now uses plain `@app-team` / `@vmware-team` / `@firewall-team` mentions instead of Slack's `<!subteam^ID|@handle>` syntax, and replaced Step 3's `rca_lookup_datafeed(?job_id)` + raw-ESQL-signals step with two new instruqt-only tools: `rca_fetch_firewall_change(?window_start, ?window_end)` and `rca_fetch_app_errors(?window_start, ?window_end)`. These two tools exist ONLY in `instruqt/setup_agent.py` (not in root `setup_agent.py`) — the instruqt tool/skill set has diverged from root beyond the "identical business logic" that used to hold; root still uses the 3-tool/Slack-subteam version. Root `setup_agent.py` was NOT touched.
+
+**Challenge 04 assignment.md finished (2026-07-07):** `instruqt/agentic-rca-track-1noreo/04-not-under-agent-builder-watch/assignment.md`'s "What Actually Happened While You Slept" section (previously just "to be continued") now has a 4-step walkthrough of the Kibana Alerts page → one alert's ML detail → the rule's Actions tab (workflow wiring) → the actual Workflows run, closing the loop back to the Mattermost thread from earlier in the challenge. Uses 4 placeholder image filenames (`alerts-list-image.png`, `alert-detail-image.png`, `alert-actions-image.png`, `workflow-run-image.png`) — **real screenshots from the live sandbox still need to be captured and dropped into `assets/`** before this is publishable; nothing else is blocking. The closing note was also rewritten from a generic "same skill/agent" callback into a value-selling wrap-up: operator quality-of-life (no page, no manual log-diving, no blank-page report writing) + SLO protection (MTTR in minutes not hours, consistent investigation rigor day or night) — this is the track's closing pitch, keep it in that frame if it gets edited again.
+
+**`morning_meteo` skill reliability fix (2026-07-07, instruqt only):** Live testing surfaced that the agent sometimes skipped the raw-signal tools (`rca_fetch_firewall_change` / `rca_fetch_app_errors`) for some incident windows, producing a partial RCA backed only by the ML anomaly. Root cause was the skill's step structure — the anomaly lookup and the two raw-signal lookups were split across two separate steps ("Process EVERY window" then "Deepen knowledge"), giving the model a seam where it would treat the second step as optional/skippable. Fix (user-validated by testing in the live sandbox before I synced it back to source): collapsed into a single "Process EVERY window" step that calls all three tools (`rca_fetch_anomalies_in_window`, `rca_fetch_firewall_change`, `rca_fetch_app_errors`) back-to-back per window, cutting the skill from 4 steps to 3. **Lesson for future skill-authoring:** when a procedure needs several tool calls done together per iteration/window, put them in one step rather than splitting into sequential steps — splitting creates a completion gate the model can silently fail. Applied to `instruqt/setup_agent.py` only — root `setup_agent.py`'s `morning_meteo` (different, older 5-step structure using `rca_lookup_datafeed` + generic ESQL) was explicitly left un-synced per user decision, since only the instruqt track is under active iteration. **Not yet redeployed** — user will re-run `setup_agent.py`/`setup_elastic.sh` against the sandbox themselves; I did not touch the live agent.
+
+### Elastic-side setup: `instruqt/setup_elastic.sh`
+
+**Why:** Root `ingest.py` / `setup_agent.py` / `setup_workflow.py` / `setup_ml_jobs.py` / `setup_dashboard.py` connect via `ES_CLOUD_ID` (Elastic Cloud only). The Instruqt sandbox is self-hosted (`http://elasticsearch-es-http.default.svc:9200` for ES, `http://kubernetes-vm:30001` for Kibana, API key from the Instruqt env file at `/home/kubernetes-vm/env`). User explicitly required **zero changes to the root ECH scripts** — the two deployment modes must fully coexist.
+
+**Design:** `instruqt/` holds near-identical Python copies of all 5 root scripts — only the connection-bootstrap block (URL derivation + auth headers) differs; all business logic (tools, skills, agent, ML job/alert defs, ingestion) is copy-pasted unchanged. `instruqt/setup_elastic.sh` is a thin bash entry point: sources the Instruqt env file, exports `ES_URL`/`KB_URL`/`KB_USER`/`KB_PASS` (with sane defaults), `pip install`s the `elasticsearch` client, runs `ingest.py` + `setup_agent.py`, then creates/refreshes the Mattermost Kibana Webhook connector, then runs `setup_workflow.py` + `setup_ml_jobs.py` + `setup_dashboard.py` (`set -euxo pipefail`). The connector block must sit between those two script groups — see "Connector ID wiring" above.
+
+**Connection convention observed in other Instruqt scripts (e.g. the BBQ lab) and followed here:**
+- Elasticsearch calls → `Authorization: ApiKey $ELASTICSEARCH_APIKEY` against `ES_URL`.
+- Kibana calls → HTTP Basic `elastic:changeme` against `KB_URL` (NOT the API key — Kibana auth uses basic in this environment, ES uses ApiKey).
+
+**What's intentionally still shared with root (no duplication, read-only references):**
+- `instruqt/ingest.py` imports `generate.py` from the repo root via `sys.path` (pure data-generation logic, no connection code — duplicating it would create drift risk for zero benefit) and writes to the root `data/` dir by default.
+- `instruqt/setup_dashboard.py` reads `../shopeasy_mission_control.ndjson`. Single source of truth for both deployment modes.
+
+**Diverged from root, NOT shared:** `instruqt/workflow_alert_triage.yaml` is its own file (read by `instruqt/setup_workflow.py` from its own directory, not `../workflow_alert_triage.yaml`) because the Instruqt Kibana version (9.4.2) requires different step-type syntax than whatever the root file currently targets — `ai.agent` for Agent Builder calls and `cases.*` for case management, instead of the generic `kibana.request` escape hatch. The root `workflow_alert_triage.yaml` has NOT been updated to match (as of this writing) — the two files will drift unless someone ports fixes both ways by hand. The instruqt version has also since dropped the human-in-the-loop remediation wait entirely (see "Workflow: ShopEasy — Alert Triage" above) and gained Mattermost notification — root has neither change.
 
 ---
 
