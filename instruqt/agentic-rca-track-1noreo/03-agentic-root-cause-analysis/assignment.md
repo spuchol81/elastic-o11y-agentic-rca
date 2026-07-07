@@ -45,10 +45,7 @@ Morning meteo report
 5. After nearly 30 seconds you should see the report of the agent. It should give you insights from the logs you may not even have noticed during the previous challenge
  ![Jul-06-2026_at_14.45.29-image.png](../assets/Jul-06-2026_at_14.45.29-image.png)
  > [!NOTE]
-> This is live generated data, so content may differ. If you feel the LLM missed a thing, you can challenge it by following-up for instance with
-> ```
-> You forgot one of the incident windows
-> ```
+> This is AI generated data, so content may differ.
 
 Pausing a bit and understand how it works
 ===

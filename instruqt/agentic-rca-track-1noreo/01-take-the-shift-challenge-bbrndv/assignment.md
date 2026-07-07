@@ -36,7 +36,7 @@ You drop into your chair, coffee still too hot to drink, and wake your laptop up
 ![Jul-06-2026_at_11.30.28-image.png](../assets/Jul-06-2026_at_11.30.28-image.png)
 Then this lands in Mattermost from your VP:
 
-> **Priya:** "Heard we had a rough night. I'm in the exec sync in under two hours and I need something concrete to bring — not 'we're looking into it.' What broke, when, and how bad. Have an answer for me before I walk into that room."
+> **Priya:** "Heard we had a rough night. I'm in the exec sync in under two hours and I need something concrete to bring,  not a *we're looking into it*... I want to know what broke, when, and how bad. Have an answer for me before I walk into that room please"
 
 Let's use the ShopEasy Dashboard to find out the root cause of the overnight Issue
 
